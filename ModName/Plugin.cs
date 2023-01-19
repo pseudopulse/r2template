@@ -7,9 +7,7 @@ using UnityEngine.AddressableAssets;
 using System.Reflection;
 
 namespace ModName {
-    [BepInDependency(R2API.R2API.PluginGUID)]
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
-    [R2APISubmoduleDependency(nameof(ItemAPI), nameof(LanguageAPI))]
     
     public class ModName : BaseUnityPlugin {
         public const string PluginGUID = PluginAuthor + "." + PluginName;
@@ -22,7 +20,7 @@ namespace ModName {
 
         public void Awake() {
             // assetbundle loading 
-            AssetBundle.LoadFromFile(Assembly.GetExecutingAssembly().Location.Replace("dll name", "bundle name"));
+            bundle = AssetBundle.LoadFromFile(Assembly.GetExecutingAssembly().Location.Replace("dll name", "bundle name"));
 
             // set logger
             ModLogger = Logger;

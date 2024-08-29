@@ -1,4 +1,4 @@
 # libs and build directories
-ModName/libs
 ModName/bin
 ModName/obj
+build.sh

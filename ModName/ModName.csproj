@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-      <TargetFramework>netstandard2.0</TargetFramework>
+      <TargetFramework>netstandard2.1</TargetFramework>
       <LangVersion>preview</LangVersion>
       <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
@@ -18,16 +18,11 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="BepInEx.Core" Version="5.4.19" />
-      <PackageReference Include="RiskOfRain2.GameLibs" Version="1.2.4-r.0" />
-      <PackageReference Include="UnityEngine.Modules" Version="2019.4.26" />
+      <PackageReference Include="RiskOfRain2.GameLibs" Version="1.3.1.275-r.0" />
+      <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" />
       <PackageReference Include="MMHOOK.RoR2" Version="2022.9.20">
         <NoWarn>NU1701</NoWarn>
       </PackageReference>
-      <PackageReference Include="R2API.ContentManagement" Version="1.0.1" />
-      <PackageReference Include="R2API.Core" Version="5.0.4" />
-      <PackageReference Include="R2API.Language" Version="1.0.0" />
-      <PackageReference Include="R2API.Prefab" Version="1.0.1" />
-      <PackageReference Include="R2API.RecalculateStats" Version="1.0.0" />
     </ItemGroup>
   
     <ItemGroup>
@@ -70,6 +65,12 @@
       <Reference Include="Zio">
         <HintPath>libs\Zio.dll</HintPath>
         <Private>false</Private>
+      </Reference>
+      <Reference Include="Decalicious">
+        <HintPath>.\libs\Decalicious.dll</HintPath>
+      </Reference>
+      <Reference Include="Unity.Postprocessing.Runtime">
+        <HintPath>.\libs\Unity.Postprocessing.Runtime.dll</HintPath>
       </Reference>
     </ItemGroup>
   

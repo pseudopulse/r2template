@@ -3,7 +3,7 @@ using System;
 using Unity;
 using System.Linq;
 
-namespace RaindropLobotomy.Utils
+namespace ModName.Utils
 {
     public static class UnityExtensions
     {

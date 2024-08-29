@@ -13,5 +13,5 @@ global using System;
 global using Object = UnityEngine.Object;
 global using UnityEngine.Networking;
 global using BepInEx.Configuration;
-global using Assets = ModName.Utils.Assets;
+global using Paths = ModName.Utils.Assets;
 

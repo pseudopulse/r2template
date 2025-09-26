@@ -12,6 +12,7 @@ namespace ModName.Utils {
         public abstract string MuzzleString { get; }
         public virtual string MechanimHitboxParameter { get; }
         public virtual bool ScaleHitPauseDurationWithAttackSpeed { get; } = true;
+        public virtual Func<bool> AlternateActiveParameter { get; } = () => { return true; };
         public override void OnEnter()
         {
             base.baseDuration = BaseDuration;
@@ -25,6 +26,22 @@ namespace ModName.Utils {
             if (MechanimHitboxParameter != null) base.mecanimHitboxActiveParameter = MechanimHitboxParameter;
             base.scaleHitPauseDurationAndVelocityWithAttackSpeed = ScaleHitPauseDurationWithAttackSpeed;
             base.OnEnter();
+        }
+
+        public override void FixedUpdate()
+        {
+            base.fixedAge += Time.fixedDeltaTime;
+
+            if (string.IsNullOrEmpty(MechanimHitboxParameter) && AlternateActiveParameter()) {
+                base.BeginMeleeAttackEffect();
+            }
+            else if (animator.GetFloat(MechanimHitboxParameter) >= 0.5f) {
+                base.BeginMeleeAttackEffect();
+            }
+
+            if (base.isAuthority) {
+                base.AuthorityFixedUpdate();
+            }
         }
     }
 }

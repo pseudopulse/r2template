@@ -27,6 +27,8 @@ namespace ModName {
         public void Awake() {
             // set logger
             ModLogger = Logger;
+
+            ConfigManager.HandleConfigAttributes(typeof(ModName).Assembly, Config);
         }
     }
 }

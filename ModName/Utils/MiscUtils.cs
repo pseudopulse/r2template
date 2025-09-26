@@ -1,7 +1,9 @@
 ﻿using RoR2;
 using RoR2.Navigation;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace ModName.Utils
@@ -9,6 +11,23 @@ namespace ModName.Utils
     public static class MiscUtils
     {
         //Sourced from source code, couldn't access because it was private, modified a little
+
+        public static bool HasUnlockable(NetworkUser networkUser, UnlockableDef unlockableDef)
+        {
+            if (!networkUser)
+            {
+                return true;
+            }
+
+            LocalUser localUser = networkUser.localUser;
+            if (localUser != null)
+            {
+                return localUser.userProfile.HasUnlockable(unlockableDef.cachedName);
+            }
+
+            return networkUser.unlockables.Contains(UnlockableCatalog.GetUnlockableDef(unlockableDef.cachedName));
+        }
+
         public static Vector3? RaycastToDirection(Vector3 position, float maxDistance, Vector3 direction, int layer)
         {
             if (Physics.Raycast(new Ray(position, direction), out RaycastHit raycastHit, maxDistance, layer, QueryTriggerInteraction.Ignore))
@@ -16,10 +35,6 @@ namespace ModName.Utils
                 return raycastHit.point;
             }
             return null;
-        }
-
-        public static Vector3? GroundPoint(this Vector3 point) {
-            return RaycastToDirection(point, float.PositiveInfinity, Vector3.down, LayerIndex.world.mask);
         }
 
         /// <summary>
@@ -59,7 +74,7 @@ namespace ModName.Utils
                 nodesToCheck.GetNodePosition(closestNode, out ResultPosition);
                 return ResultPosition;
             }
-
+            
             return Vector3.zero;
         }
 
@@ -209,120 +224,177 @@ namespace ModName.Utils
             return SurfaceAlignmentInfo;
         }
 
-        ///<summary>Returns a list of all safe nodes within the specified radius</summary>
+        public static FireProjectileInfo GetProjectile(GameObject prefab, float coeff, CharacterBody owner, DamageTypeCombo? damageTypeCombo = null)
+        {
+            FireProjectileInfo info = new()
+            {
+                damage = owner.damage * coeff,
+                crit = owner.RollCrit(),
+                projectilePrefab = prefab,
+                owner = owner.gameObject,
+                position = owner.corePosition,
+                rotation = Util.QuaternionSafeLookRotation(owner.inputBank.aimDirection),
+            };
+
+            if (damageTypeCombo != null)
+            {
+                info.damageTypeOverride = damageTypeCombo;
+            }
+
+            return info;
+        }
+
+        public static Vector3? GroundPoint(this Vector3 point)
+        {
+            return RaycastToDirection(point, float.PositiveInfinity, Vector3.down, LayerIndex.world.mask);
+        }
+
+        public static Tuple<Vector3?, Vector3?> GroundPointWithNormal(this Vector3 point)
+        {
+            if (Physics.Raycast(point + (Vector3.up * 20f), Vector3.down, out RaycastHit info, 4000f, LayerIndex.world.mask))
+            {
+                return new(info.point, info.normal);
+            }
+
+            return new(null, null);
+        }
+
+        public static void DeformPoint(Vector3 pos, float radius = 5f, float depth = 3f)
+        {
+            Collider[] cols = Physics.OverlapSphere(pos, radius, LayerIndex.world.mask);
+
+            for (int i = 0; i < cols.Length; i++)
+            {
+                Collider col = cols[i];
+
+                if (col is MeshCollider && col.TryGetComponent<MeshFilter>(out MeshFilter filter))
+                {
+                    if (!filter.mesh.isReadable)
+                    {
+                        continue;
+                    }
+
+                    DeformCollider(pos, radius, depth, filter, col as MeshCollider);
+                }
+            }
+        }
+
+        public static void DeformCollider(Vector3 pos, float radius, float depth, MeshFilter filter, MeshCollider collider)
+        {
+            if (!filter.mesh.isReadable) return;
+
+            Matrix4x4 localToWorld = filter.transform.localToWorldMatrix;
+            Matrix4x4 worldToLocal = filter.transform.worldToLocalMatrix;
+
+            Vector3[] verts = new Vector3[filter.mesh.vertices.Length];
+            Vector3[] original = filter.mesh.vertices;
+            List<Color> colors = new();
+            filter.mesh.GetColors(colors);
+
+            Parallel.For(0, verts.Length, (i, state) =>
+            {
+                Vector3 local = original[i];
+                Vector3 world = localToWorld.MultiplyPoint3x4(local);
+
+                float distance = Vector3.Distance(world, pos);
+
+                if (distance <= radius)
+                {
+                    float scalar = (1f - (distance / radius));
+                    world += (Vector3.down) * (depth) * scalar;
+
+                    colors[i] = Color.Lerp(colors[i], Color.red, scalar);
+                }
+
+                verts[i] = worldToLocal.MultiplyPoint3x4(world);
+            });
+
+            filter.mesh.SetVertices(verts.ToList());
+            filter.mesh.SetColors(colors);
+            collider.sharedMesh = filter.mesh;
+        }
+
+        //<summary>Returns a list of all safe nodes within the specified radius</summary>
         ///<param name="center">the center position</param>
         ///<param name="distance">the max distance</param>
         ///<returns>the list of positions</returns>
-        public static Vector3[] GetSafePositionsWithinDistance(Vector3 center, float distance) {
-            if (SceneInfo.instance && SceneInfo.instance.groundNodes) {
+        public static Vector3[] GetSafePositionsWithinDistance(Vector3 center, float distance)
+        {
+            if (SceneInfo.instance && SceneInfo.instance.groundNodes)
+            {
                 NodeGraph graph = SceneInfo.instance.groundNodes;
                 List<Vector3> valid = new();
-                foreach (NodeGraph.Node node in graph.nodes) {
-                    if (Vector3.Distance(node.position, center) <= distance) {
+                foreach (NodeGraph.Node node in graph.nodes)
+                {
+                    if (Vector3.Distance(node.position, center) <= distance)
+                    {
                         valid.Add(node.position);
                     }
                 }
                 return valid.ToArray();
             }
-            else {
+            else
+            {
                 return new Vector3[] { center };
             }
         }
 
-        public static Vector3 GetRandomGroundNode(NodeFlags reqFlags, NodeFlags forbiddenFlags, HullMask hull) {
-            if (SceneInfo.instance && SceneInfo.instance.groundNodes) {
-                NodeGraph graph = SceneInfo.instance.groundNodes;
-
-                List<Vector3> valid = new();
-
-                foreach (NodeGraph.Node node in graph.nodes) {
-                    if (
-                        (node.forbiddenHulls & hull) == 0 &&
-                        (node.flags & reqFlags) == reqFlags &&
-                        (node.flags & forbiddenFlags) == 0
-                    ) {
-                        valid.Add(node.position);
-                    }
-                }
-
-                if (valid.Count > 0) {
-                    return valid.GetRandom();
-                }
-                else {
-                    return Random.onUnitSphere * 500f;
-                }
-            }
-            else {
-                return Random.onUnitSphere * 500f;
-            }
-        }
-
-        public static AnimatorOverrideController FixOverrideController(RuntimeAnimatorController target, AnimatorOverrideController original) {
-            AnimatorOverrideController controller = new(target);
-
-            foreach (AnimationClip clip in original.animationClips) {
-                Debug.Log(clip.name + " - clip");
-            }
-
-            return controller;
+        internal static void GetSafePositionsWithinDistance()
+        {
+            throw new NotImplementedException();
         }
     }
 
-    public class Timer {
-        public float duration;
-        public float cur;
-        private bool inv;
-        public bool expired = false;
-        private bool expires;
-        private bool trueIfExp;
-        private bool resetOnExp;
+    public class LazyAddressable<T> where T : UnityEngine.Object
+    {
+        private Func<T> func;
+        private T asset = null;
 
-        public Timer(float dur, bool inverse = false, bool expires = false, bool trueOnExpire = false, bool resetOnExpire = false) {
-            duration = dur;
-            inv = inverse;
-            trueIfExp = trueOnExpire;
-            this.resetOnExp = resetOnExpire;
-            this.expires = expires;
-            Reset();
+        public T Asset
+        {
+            get
+            {
+                if (!asset)
+                {
+                    asset = func();
+                }
+
+                return asset;
+            }
         }
 
-        public void Reset() => cur = inv ? duration : 0f;
-        public bool Tick() {
-            cur += inv ? -Time.fixedDeltaTime : Time.fixedDeltaTime;
+        public LazyAddressable(Func<T> func)
+        {
+            this.func = func;
+        }
 
-            bool res = inv ? cur <= 0f : cur >= duration;
-
-            if (expires) {
-                if (expired && !resetOnExp) return trueIfExp;
-                expired = res;
-                if (resetOnExp && expired) {
-                    expired = false;
-                    Reset();
-                    // Debug.Log("resetting");
-                }
-            }
-
-            return res;
+        public static implicit operator T(LazyAddressable<T> addressable)
+        {
+            return addressable.Asset;
         }
     }
 
-    public class LazyIndex {
+    public class LazyIndex
+    {
         private string target;
         private BodyIndex _value = BodyIndex.None;
         public BodyIndex Value => UpdateValue();
 
-        public LazyIndex(string target) {
+        public LazyIndex(string target)
+        {
             this.target = target;
         }
 
-        public BodyIndex UpdateValue() {
-            if (_value == BodyIndex.None || _value == (BodyIndex)(-1)) {
+        public BodyIndex UpdateValue()
+        {
+            if (_value == BodyIndex.None || _value == (BodyIndex)(-1))
+            {
                 _value = BodyCatalog.FindBodyIndex(target);
             }
 
             return _value;
         }
 
-        public static implicit operator BodyIndex(LazyIndex index) => index.Value; 
+        public static implicit operator BodyIndex(LazyIndex index) => index.Value;
     }
 }
